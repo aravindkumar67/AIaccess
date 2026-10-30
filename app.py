@@ -63,7 +63,7 @@ if st.session_state.run:
         pipeline=FallPipeline(settings)
         # Capture thread owns VideoCapture; inference loop consumes the newest frame.
         lock=threading.Lock()
-        shared={"frame":None,"timestamp":0.0,"done":False,"error":None}
+        shared={"frame":None,"timestamp":0.0,"done":False,"error":None}\n        stop_capture=threading.Event()
         def capture_loop():
             try:
                 while st.session_state.run:
@@ -78,7 +78,7 @@ if st.session_state.run:
         worker=threading.Thread(target=capture_loop,daemon=True,name="opencv-capture")
         worker.start()
         last=None; frames=0
-        while st.session_state.run and not shared["done"]:
+        while not stop_capture.is_set() and not shared["done"]:\n            if stop:\n                stop_capture.set()
             with lock:
                 frame=shared["frame"].copy() if shared["frame"] is not None else None
                 ts=shared["timestamp"]
