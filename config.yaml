@@ -1,0 +1,19 @@
+# Normalized (0..1) polygons are placeholders; calibrate for your camera.
+confidence: 0.30
+iou: 0.50
+image_size: 640
+device: ""
+classes: []
+tracker: bytetrack.yaml
+history_size: 24
+min_track_observations: 5
+departure_vertical_pixels: 18
+ground_stable_frames: 5
+ground_motion_pixels: 7
+lost_track_grace_frames: 12
+event_cooldown_frames: 20
+evidence_root: fallenobjects
+regions:
+  conveyor: [[0.02, 0.20], [0.98, 0.20], [0.98, 0.62], [0.02, 0.62]]
+  ground: [[0.02, 0.63], [0.98, 0.63], [0.98, 0.98], [0.02, 0.98]]
+  arm_exclusion: []
