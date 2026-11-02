@@ -1,17 +1,20 @@
-# Normalized (0..1) polygons are placeholders; calibrate for your camera.
+# Calibrate polygons for the uploaded camera view. Coordinates are normalized 0..1.
 confidence: 0.30
 iou: 0.50
 image_size: 640
 device: ""
-classes: []
+classes: []                  # Empty means all pretrained COCO classes.
 tracker: bytetrack.yaml
 history_size: 24
-min_track_observations: 5
 departure_vertical_pixels: 18
-ground_stable_frames: 5
+free_fall_vertical_pixels: 12
+ground_confirm_frames: 2      # Fast confirmation after validated ground contact.
 ground_motion_pixels: 7
+settled_frames: 8
+settle_motion_pixels: 5
 lost_track_grace_frames: 12
-event_cooldown_frames: 20
+evidence_clip_frames: 90
+fps: 20
 evidence_root: fallenobjects
 regions:
   conveyor: [[0.02, 0.20], [0.98, 0.20], [0.98, 0.62], [0.02, 0.62]]

@@ -1,4 +1,4 @@
-"""Streamlit dashboard for the Falling Object Detection POC."""
+"""Streamlit UI; processing runs in a worker and the UI polls thread-safe state."""
 import os
 import tempfile
 import threading
@@ -10,167 +10,126 @@ import streamlit as st
 
 from fallwatch.config import load_settings
 from fallwatch.pipeline import FallPipeline
+from fallwatch.state import RuntimeState
 
 st.set_page_config(page_title="AIaccess | FallWatch", page_icon="📡", layout="wide")
-st.markdown("""
-<style>
-[data-testid="stAppViewContainer"] {background:#0b1020;color:#e8edf7}
-[data-testid="stSidebar"] {background:#111a2e}
-div[data-testid="stMetric"] {background:#151f35;border:1px solid #283652;padding:12px;border-radius:10px}
-h1,h2,h3 {color:#e8edf7}
-</style>
-""", unsafe_allow_html=True)
-
-st.title("📡 FallWatch")
-st.caption("AIaccess · Fixed-camera object fall detection & tracking · Local POC (no robot/API control)")
+st.title("FallWatch — Falling Object Detection")
+st.caption("Pretrained YOLO26n · video upload · fixed-camera fall events · local-only POC")
 
 with st.sidebar:
-    st.subheader("SOURCE")
-    mode = st.radio("Input", ["Video file", "Camera"], horizontal=True)
-    uploaded = st.file_uploader("Choose recorded video", type=["mp4", "avi", "mov", "mkv"]) if mode == "Video file" else None
-    camera = int(st.number_input("Camera index", min_value=0, max_value=10, value=0)) if mode == "Camera" else 0
-    model_path = st.text_input("YOLO weights path", os.getenv("YOLO_MODEL_PATH", "yolo26n.pt"))
-    conf = st.slider("Confidence", 0.05, 0.95, 0.30, 0.05)
-    st.divider()
-    start = st.button("▶ Start / process", type="primary", use_container_width=True)
-    stop = st.button("■ Stop", use_container_width=True)
-    st.caption("Calibrate normalized conveyor/ground/arm polygons in config.yaml.")
+    uploaded = st.file_uploader("Recorded video", type=["mp4", "avi", "mov", "mkv"])
+    model_path = st.text_input("YOLO weights", os.getenv("YOLO_MODEL_PATH", "yolo26n.pt"))
+    confidence = st.slider("Confidence threshold", 0.05, 0.95, 0.30, 0.05)
+    start_clicked = st.button("Start processing", type="primary", disabled=uploaded is None)
+    stop_clicked = st.button("Stop processing")
+    reset_clicked = st.button("Reset event flags")
+    st.caption("Calibrate conveyor, ground, and optional arm-exclusion polygons in config.yaml.")
 
-if "run" not in st.session_state:
-    st.session_state.run = False
-if "events" not in st.session_state:
-    st.session_state.events = []
-if start:
-    st.session_state.run = True
-if stop:
-    st.session_state.run = False
+if "fallwatch_runtime" not in st.session_state:
+    st.session_state.fallwatch_runtime = RuntimeState()
+if "fallwatch_worker" not in st.session_state:
+    st.session_state.fallwatch_worker = None
+if "fallwatch_stop" not in st.session_state:
+    st.session_state.fallwatch_stop = None
+if "fallwatch_temp" not in st.session_state:
+    st.session_state.fallwatch_temp = None
 
-left, right = st.columns([2.15, 1])
-with left:
-    st.subheader("LIVE VIEW")
-    view = st.empty()
-    state_line = st.empty()
-with right:
-    st.subheader("EVENT MONITOR")
-    metrics = st.empty()
-    flag_view = st.empty()
-    event_list = st.empty()
+runtime = st.session_state.fallwatch_runtime
 
-if not st.session_state.run:
-    view.info("Choose a video or camera source, then press Start / process.")
-    metrics.metric("Confirmed falls", len(st.session_state.events))
-    flag_view.code("object_fallen = False\narm_approach = False")
-    state_line.caption("Waiting for input")
-    event_list.dataframe(st.session_state.events[-10:][::-1], use_container_width=True)
-    st.stop()
-
-if mode == "Video file" and uploaded is None:
-    st.warning("Select a video file first.")
-    st.session_state.run = False
-    st.stop()
-
-source = camera
-temp_path = None
-if mode == "Video file":
-    suffix = Path(uploaded.name).suffix or ".mp4"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
-        temp_file.write(uploaded.getbuffer())
-        temp_path = temp_file.name
-    source = temp_path
-
-cap = cv2.VideoCapture(source)
-if not cap.isOpened():
-    st.error("Cannot open the selected source.")
-    st.session_state.run = False
-    if temp_path:
-        try:
-            os.unlink(temp_path)
-        except OSError:
-            pass
-    st.stop()
-
-stop_capture = threading.Event()
-lock = threading.Lock()
-shared = {"frame": None, "timestamp": 0.0, "done": False, "error": None}
-
-def capture_loop():
-    """Only this worker owns VideoCapture; it never reads Streamlit session state."""
+def process_video(path, settings, state, stop_event):
+    """Worker owns the model and processing loop; never accesses Streamlit APIs."""
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        state.update(status="error", error="OpenCV could not open the uploaded video.")
+        return
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = fps if fps and fps > 0 else float(settings.config.get("fps", 20))
+    pipeline = None
     try:
-        while not stop_capture.is_set():
+        pipeline = FallPipeline(settings)
+        state.update(status="running", error=None)
+        frame_id = 0
+        started = time.perf_counter()
+        while not stop_event.is_set():
             ok, frame = cap.read()
             if not ok:
                 break
-            with lock:
-                shared["frame"] = frame
-                shared["timestamp"] = time.monotonic()
-            # Avoid a tight, CPU-heavy loop when processing a prerecorded clip.
-            if mode == "Video file":
-                time.sleep(0.002)
-    except Exception as exc:
-        shared["error"] = str(exc)
-    finally:
-        shared["done"] = True
-
-worker = None
-try:
-    settings = load_settings()
-    settings.model_path = model_path
-    settings.config["confidence"] = conf
-    pipeline = FallPipeline(settings)
-
-    worker = threading.Thread(target=capture_loop, daemon=True, name="opencv-capture")
-    worker.start()
-    last_timestamp = None
-
-    while not shared["done"]:
-        # A Stop click triggers a Streamlit rerun; that rerun flips run=False.
-        # The current script is then interrupted by Streamlit, and finally sets the event.
-        if not st.session_state.run:
-            break
-
-        with lock:
-            frame = shared["frame"].copy() if shared["frame"] is not None else None
-            timestamp = shared["timestamp"]
-
-        if frame is None or timestamp == last_timestamp:
-            time.sleep(0.01)
-            continue
-
-        last_timestamp = timestamp
-        rendered, detections, new_events = pipeline.process(frame, timestamp)
-        view.image(cv2.cvtColor(rendered, cv2.COLOR_BGR2RGB), channels="RGB", use_container_width=True)
-
-        states = [memory.state for memory in pipeline.analyzer.tracks.values()]
-        metrics.metric("Confirmed falls", len(st.session_state.events) + len(pipeline.events))
-        # Flags are event pulses: True only on the frame where a new fall is confirmed.
-        confirmed_now = bool(new_events)
-        flag_view.code(f"object_fallen = {confirmed_now}\narm_approach = {confirmed_now}")
-        state_line.caption(
-            f"Frame {pipeline.frame_id} · active detections {len(detections)} · "
-            f"states: {', '.join(states[-5:]) if states else 'waiting'}"
-        )
-
-        if new_events:
-            st.session_state.events.extend(new_events)
+            frame_id += 1
+            video_time = (frame_id - 1) / fps
+            infer_started = time.perf_counter()
+            annotated, detections, new_events, tracks = pipeline.process(frame, video_time)
+            infer_ms = (time.perf_counter() - infer_started) * 1000
             for event in new_events:
-                st.toast(
-                    f"Fall confirmed: {event.get('class_name', 'object')} · {event.get('event_id', '')}",
-                    icon="⚠️",
-                )
-        event_list.dataframe(st.session_state.events[-10:][::-1], use_container_width=True)
+                state.add_event(event)
+            state.update(
+                frame=annotated, frame_id=frame_id, video_time=video_time,
+                tracks=tracks, inference_ms=infer_ms,
+                fps=frame_id / max(time.perf_counter() - started, 1e-6),
+            )
+        state.update(status="stopped" if stop_event.is_set() else "completed")
+    except Exception as exc:
+        state.update(status="error", error=f"{type(exc).__name__}: {exc}")
+    finally:
+        cap.release()
 
-    if shared["error"]:
-        st.error(f"Camera/video capture error: {shared['error']}")
-except Exception as exc:
-    st.exception(exc)
-finally:
-    stop_capture.set()
-    cap.release()
-    if worker is not None:
-        worker.join(timeout=2.0)
-    st.session_state.run = False
-    if temp_path:
+if start_clicked and uploaded is not None:
+    # Stop a previous worker before starting a new session.
+    previous_stop = st.session_state.fallwatch_stop
+    if previous_stop is not None:
+        previous_stop.set()
+    old_path = st.session_state.fallwatch_temp
+    if old_path:
         try:
-            os.unlink(temp_path)
+            os.unlink(old_path)
         except OSError:
             pass
+    suffix = Path(uploaded.name).suffix or ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(uploaded.getvalue())
+        video_path = tmp.name
+    st.session_state.fallwatch_temp = video_path
+    runtime = RuntimeState()
+    st.session_state.fallwatch_runtime = runtime
+    settings = load_settings()
+    settings.model_path = model_path
+    settings.config["confidence"] = confidence
+    stop_event = threading.Event()
+    worker = threading.Thread(
+        target=process_video, args=(video_path, settings, runtime, stop_event),
+        daemon=True, name="fallwatch-video-worker",
+    )
+    st.session_state.fallwatch_stop = stop_event
+    st.session_state.fallwatch_worker = worker
+    worker.start()
+
+if stop_clicked and st.session_state.fallwatch_stop is not None:
+    st.session_state.fallwatch_stop.set()
+if reset_clicked:
+    runtime.reset_flags()
+
+@st.fragment(run_every=0.2)
+def render_monitor():
+    snapshot = st.session_state.fallwatch_runtime.snapshot()
+    video_col, status_col = st.columns([2, 1])
+    with video_col:
+        st.subheader("Video")
+        if snapshot["frame"] is not None:
+            st.image(cv2.cvtColor(snapshot["frame"], cv2.COLOR_BGR2RGB), channels="RGB", use_container_width=True)
+        else:
+            st.info("Start processing to see the annotated video.")
+        st.caption(f"Status: {snapshot['status']} · Frame: {snapshot['frame_id']} · Video time: {snapshot['video_time']:.2f}s")
+    with status_col:
+        st.subheader("Fall event flags")
+        st.metric("object_fallen_onto_ground", str(snapshot["object_fallen_onto_ground"]))
+        st.metric("arm_object_approach", str(snapshot["arm_object_approach"]))
+        st.metric("Confirmed events", len(snapshot["events"]))
+        st.metric("Processing FPS", f"{snapshot['fps']:.1f}")
+        st.metric("Inference time", f"{snapshot['inference_ms']:.1f} ms")
+    if snapshot["error"]:
+        st.error(snapshot["error"])
+    st.subheader("Tracked objects")
+    st.dataframe(snapshot["tracks"], use_container_width=True, hide_index=True)
+    st.subheader("Event history")
+    st.dataframe(snapshot["events"][::-1], use_container_width=True, hide_index=True)
+
+render_monitor()

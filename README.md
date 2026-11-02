@@ -1,32 +1,51 @@
-# AIaccess — Falling Object Detection & Tracking
+# AIaccess — FallWatch
 
-A configurable computer-vision proof of concept for a fixed-camera scene containing a conveyor, common objects/geometric shapes, a robot arm, and ground. The POC supports two fall patterns: an object falling from height and an object tipping/falling from the conveyor.
+A fixed-camera falling-object detection and tracking POC using pretrained YOLO26n (COCO classes), Ultralytics tracking, OpenCV, and Streamlit. The initial workflow processes a user-uploaded video. It does not send robot commands or require an external API.
 
-## Decisions
-- Fixed camera; video-file and camera-index input.
-- YOLO26n inference with object tracking (ByteTrack through Ultralytics).
-- OpenCV capture thread plus an inference worker; Streamlit presents the latest frame and event state.
-- Temporal state machine: candidate → airborne → ground contact → settling → confirmed. A disappearance alone is not a confirmed fall.
-- Configurable local flags: `object_fallen` and `arm_approach` become true only on confirmed event. `arm_approach` is a software signal only; no robot control is issued.
-- Per-event evidence: event images, a video clip, and JSON metadata under `fallenobjects/<event_id>/`.
-- No external API calls in this POC.
+## Flow
+
+1. Upload a recorded video in Streamlit.
+2. A worker reads frames, runs YOLO tracking, and analyzes each track's motion against configured scene regions.
+3. A fall candidate progresses through airborne and ground-contact states.
+4. A fall is confirmed promptly after the configured short ground-contact validation window. Settling is monitored afterward and does not delay the initial event notification.
+5. Each confirmed event receives a unique event ID and local evidence record.
+6. The worker publishes a thread-safe state snapshot. Streamlit's periodic fragment refresh displays the latest frame, flags, tracks, metrics, and event history.
+7. The two event flags remain true until the user explicitly resets them. Resetting flags does not remove event history or evidence.
+
+## Model
+
+- Default weights: `yolo26n.pt` (pretrained COCO model).
+- The model detects only classes it was pretrained to recognize. It does not automatically detect arbitrary industrial objects or custom geometric shape classes.
+- Fine-tuning is not included in this POC.
+- Set `YOLO_MODEL_PATH` or enter the weights path in the sidebar.
 
 ## Setup
+
+The VM is assumed to have the project's YOLO/PyTorch environment and GPU setup ready. Install application dependencies if needed:
+
 ```bash
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
-# Set model_path in config.yaml or environment to your YOLO26n weights
 streamlit run app.py
 ```
 
-Calibrate normalized regions in `config.yaml` (x/y coordinates from 0.0 to 1.0) for conveyor, ground, and optional arm exclusion. Thresholds are camera-specific and must be validated with representative footage.
+## Camera calibration
 
-## Test
+Edit normalized polygons in `config.yaml` for the video view:
+- `conveyor`: region where normal conveyor travel occurs.
+- `ground`: region used to validate ground contact.
+- `arm_exclusion`: optional area excluded from fall logic.
+
+Thresholds are image-space and camera-dependent. They must be checked on the reference footage; the default polygons are examples, not universal calibration.
+
+## Validation
+
 ```bash
 pytest -q
 python scripts/generate_test_videos.py
 ```
 
-Generated clips are synthetic test fixtures for checking pipeline behavior and event timing; they are not realistic camera footage and cannot establish real-world detection accuracy. Fine-tune the detector for object classes that are not represented by the pretrained model. This is a POC, not a production safety system.
+The unit tests cover fast ground confirmation, conveyor-motion rejection, and sticky frontend state. Synthetic videos are smoke-test fixtures only. They cannot establish real-world precision/recall or event latency. Run the POC on the actual reference video and record false positives, missed events, confirmation latency, frontend update latency, and evidence integrity before calling it validated.
+
+## Evidence
+
+Each confirmed event is saved under `fallenobjects/<event_id>/` with annotated event images, a video clip, and metadata. The app is a POC, not a production safety system.
