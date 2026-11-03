@@ -1,18 +1,22 @@
-# Fallen Object POC - Detailed Implementation Plan (v2.2)
+# AIaccess — Fallen Object POC (v2.2)
 
-Complete implementation of the Fallen Object POC pipeline strictly following Design v2.2 without any deviations.
+Streamlit proof of concept for monitoring fallen objects, conveyor regions, and AMR approach risk. This repository uses the agreed layout.
 
-## Folder Structure
-- `core/`: State machines, detector wrappers, zone manager, path network graph, geometry transform, validation, signal evaluation, evidence writers.
-- `config.yaml`: Frozen configuration thresholds.
-- `camera_intrinsics.yaml` & `calibration.yaml`: Real-world intrinsics and homography point pairs.
+## Layout
+
 - `app.py`: Streamlit dashboard entrypoint.
-- `test_videos/`: Test input video clips (`VID-20261102-WA0002.mp4` and `istockphoto-2204511529-640_adpp_is.mp4`).
-- `eval/`: Offline performance and accuracy evaluation.
-- `evidence/`: Structured evidence folders (`low`, `medium`, `high`, `red`, `uncertain`).
+- `core/`: state, perception, geometry, event logic, evidence, and pipeline modules.
+- `config.yaml`: detection and event thresholds.
+- `camera_intrinsics.yaml` and `calibration.yaml`: camera/scene calibration placeholders.
+- `test_videos/`: sample clips and uploaded videos.
+- `eval/evaluate.py`: evidence metric summary.
+- `evidence/`: categorized evidence output.
 
-## Quick Start
+## Run
+
 ```bash
-pip install streamlit opencv-python pyyaml numpy
+python -m pip install -r requirements.txt
 streamlit run app.py
 ```
+
+Calibration files are placeholders, not measured camera calibration. Populate them before treating coordinates or risk metrics as real-world measurements.
