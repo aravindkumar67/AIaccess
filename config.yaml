@@ -1,4 +1,5 @@
-# AIaccess v2.2 configuration; calibrate regions and thresholds for the deployed camera.
+# AIaccess event configuration. Polygons are normalized [x,y] coordinates.
+# Replace these placeholder polygons with measured camera-specific points.
 model: yolo26n.pt
 imgsz: 640
 conf: 0.30
@@ -6,21 +7,32 @@ iou: 0.50
 device: ""
 classes: []
 tracker: bytetrack.yaml
-setup_window_sec: 2.0
+
 history_size: 24
 min_track_observations: 5
-fall_conveyor_residency_sec: 1.0
-footprint_bottom_ratio: 0.35
-amr_conf_min: 0.25
 departure_vertical_pixels: 18
+ground_y_ratio: 0.63
 ground_stable_frames: 5
 ground_motion_pixels: 7
-lost_track_grace_frames: 12
-event_cooldown_frames: 20
+conveyor_residency_frames: 8
+footprint_bottom_ratio: 0.35
+
 high_interior_overlap_min: 0.01
 medium_strip_overlap_min: 0.01
+
+amr_classes: [car, truck, forklift]
+amr_conf_min: 0.25
+amr_approach_min_frames: 3
+amr_distance_decrease_pixels: 3
+amr_max_distance_pixels: 350
+
 evidence_root: evidence
+evidence_pre_seconds: 1.5
+evidence_post_seconds: 2.0
+
 regions:
   conveyor: [[0.02, 0.20], [0.98, 0.20], [0.98, 0.62], [0.02, 0.62]]
   ground: [[0.02, 0.63], [0.98, 0.63], [0.98, 0.98], [0.02, 0.98]]
+  high_risk: [[0.25, 0.65], [0.75, 0.65], [0.75, 0.95], [0.25, 0.95]]
+  yellow_path: [[0.10, 0.60], [0.90, 0.60], [0.90, 0.98], [0.10, 0.98]]
   arm_exclusion: []
