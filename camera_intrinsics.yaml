@@ -1,9 +1,0 @@
-# Uncalibrated placeholder: replace with camera calibration measurements.
-camera_matrix:
-  - [1.0, 0.0, 0.0]
-  - [0.0, 1.0, 0.0]
-  - [0.0, 0.0, 1.0]
-dist_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]
-image_width: 0
-image_height: 0
-calibrated: false

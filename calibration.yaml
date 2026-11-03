@@ -1,8 +1,0 @@
-# Uncalibrated homography placeholder. Supply matched image/world points for this scene.
-image_points: []
-world_points: []
-homography:
-  - [1.0, 0.0, 0.0]
-  - [0.0, 1.0, 0.0]
-  - [0.0, 0.0, 1.0]
-calibrated: false

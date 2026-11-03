@@ -1,71 +1,34 @@
-from collections import defaultdict, deque
+from collections import deque
+from dataclasses import dataclass,field
 
-class FallStateMachine:
-    """Per-track fall-to-floor confirmation with persistent one-shot event emission.
+@dataclass
+class TrackState:
+    track_id:int
+    label:str
+    history:deque=field(default_factory=lambda:deque(maxlen=40))
+    down_count:int=0
+    settled_count:int=0
+    fallen:bool=False
+    fall_frame:int|None=None
+    fall_bbox:list|None=None
+    last_seen:int=0
 
-    The heuristic is camera-specific. Confirming a fall requires evidence of
-    vertical descent and then a stable track in the configured ground zone.
-    """
-    def __init__(self, config):
-        self.config = config or {}
-        self.history = defaultdict(lambda: deque(maxlen=max(4, int(self.config.get("history_size", 24)))))
-        self.emitted = set()
-        self.min_observations = int(self.config.get("min_track_observations", 5))
-        self.min_drop = float(self.config.get("departure_vertical_pixels", 18))
-        self.ground_y_ratio = float(self.config.get("ground_y_ratio", 0.63))
-        self.stable_frames = int(self.config.get("ground_stable_frames", 5))
-        self.stable_motion = float(self.config.get("ground_motion_pixels", 7))
-        self.conveyor_residency = int(self.config.get("conveyor_residency_frames", 8))
-
-    def update_track(self, detection, frame_index, fps, frame_height, frame_width=None):
-        tid = detection.get("track_id")
-        if tid is None:
-            return None
-        cx, cy = detection["center"]
-        bottom_y = detection["bottom_center"][1]
-        hist = self.history[int(tid)]
-        hist.append((int(frame_index), float(cx), float(cy), float(bottom_y)))
-        if len(hist) < self.min_observations or int(tid) in self.emitted:
-            return None
-
-        data = list(hist)
-        # Look at a short window so an object moving along the belt does not
-        # accumulate a false "fall" merely from long-term image perspective.
-        window = min(len(data), max(self.min_observations, self.stable_frames + 2))
-        recent = data[-window:]
-        displacement = recent[-1][2] - recent[0][2]
-        in_ground_band = bottom_y >= frame_height * self.ground_y_ratio
-
-        stable = False
-        if len(data) >= self.stable_frames:
-            stable_data = data[-self.stable_frames:]
-            xs = [p[1] for p in stable_data]
-            ys = [p[2] for p in stable_data]
-            motion = max(
-                ((xs[i]-xs[0])**2 + (ys[i]-ys[0])**2)**0.5
-                for i in range(len(xs))
-            )
-            stable = motion <= self.stable_motion
-
-        if displacement < self.min_drop or not in_ground_band or not stable:
-            return None
-
-        self.emitted.add(int(tid))
-        return {
-            "event_id": f"FALL-{int(tid)}-{int(frame_index)}",
-            "event": "Fall",
-            "Anomaly_Type": "Object_Fallen_From_Conveyor",
-            "track_id": int(tid),
-            "class_name": detection.get("class_name", "object"),
-            "confidence": round(float(detection.get("confidence", 0.0)), 4),
-            "frame": int(frame_index),
-            "time_sec": round(int(frame_index) / max(float(fps), 1.0), 3),
-            "bbox": [round(float(v), 1) for v in detection["bbox"]],
-            "fallen_onto_ground": True,
-            "amr_approach": False,
-            "uncertain": False,
-            "coords_source": "image",
-            "pixel": [round(float(cx), 1), round(float(bottom_y), 1)],
-            "risk": "pending",
-            "basis": "downward displacement followed by stable ground-band observations",
-        }
+class FallDetector:
+    def __init__(self,cfg): self.cfg=cfg; self.tracks={}
+    def update(self,track_id,label,bbox,frame_index):
+        s=self.tracks.setdefault(int(track_id),TrackState(int(track_id),str(label)))
+        cx=(bbox[0]+bbox[2])/2; cy=(bbox[1]+bbox[3])/2
+        s.history.append((frame_index,cx,cy,list(map(float,bbox)))); s.last_seen=frame_index
+        if len(s.history)<2: return s,False
+        prev=s.history[-2]; dy=cy-prev[2]; speed=((cx-prev[1])**2+(cy-prev[2])**2)**0.5
+        if not s.fallen and dy>=float(self.cfg.get('fall_vertical_px',35)): s.down_count+=1
+        elif not s.fallen: s.down_count=max(0,s.down_count-1)
+        if not s.fallen and s.down_count>=int(self.cfg.get('fall_confirm_frames',2)):
+            s.fallen=True; s.fall_frame=frame_index; s.fall_bbox=list(map(float,bbox)); return s,True
+        if s.fallen and speed<=float(self.cfg.get('settled_speed_px_per_frame',3.5)): s.settled_count+=1
+        elif s.fallen: s.settled_count=0
+        return s,False
+    def prune(self,frame_index):
+        expiry=int(self.cfg.get('track_expiry_frames',45))
+        for tid in list(self.tracks):
+            if frame_index-self.tracks[tid].last_seen>expiry: del self.tracks[tid]

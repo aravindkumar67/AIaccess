@@ -1,38 +1,30 @@
-# AIaccess event configuration. Polygons are normalized [x,y] coordinates.
-# Replace these placeholder polygons with measured camera-specific points.
-model: yolo26n.pt
-imgsz: 640
-conf: 0.30
-iou: 0.50
-device: ""
-classes: []
-tracker: bytetrack.yaml
-
-history_size: 24
-min_track_observations: 5
-departure_vertical_pixels: 18
-ground_y_ratio: 0.63
-ground_stable_frames: 5
-ground_motion_pixels: 7
-conveyor_residency_frames: 8
-footprint_bottom_ratio: 0.35
-
-high_interior_overlap_min: 0.01
-medium_strip_overlap_min: 0.01
-
-amr_classes: [car, truck, forklift]
-amr_conf_min: 0.25
-amr_approach_min_frames: 3
-amr_distance_decrease_pixels: 3
-amr_max_distance_pixels: 350
-
-evidence_root: evidence
-evidence_pre_seconds: 1.5
-evidence_post_seconds: 2.0
-
+camera:
+  camera_id: CAM-POC-01
+  calibration_quality: PROVISIONAL
+  coordinate_frame: image_px
+  intrinsics: {fx: 920.0, fy: 920.0, cx: 640.0, cy: 360.0}
+  extrinsics: {translation_m: [0.0, 0.0, 0.0], rotation_rpy_deg: [0.0, 0.0, 0.0]}
+classes:
+  obstacle: [box, crate, package, bottle, ball, chair, person, obstacle]
+  amr: [amr, robot, mobile_robot]
 regions:
-  conveyor: [[0.02, 0.20], [0.98, 0.20], [0.98, 0.62], [0.02, 0.62]]
-  ground: [[0.02, 0.63], [0.98, 0.63], [0.98, 0.98], [0.02, 0.98]]
-  high_risk: [[0.25, 0.65], [0.75, 0.65], [0.75, 0.95], [0.25, 0.95]]
-  yellow_path: [[0.10, 0.60], [0.90, 0.60], [0.90, 0.98], [0.10, 0.98]]
-  arm_exclusion: []
+  conveyor: [[80,80],[1180,80],[1180,430],[80,430]]
+  floor: [[0,400],[1280,400],[1280,720],[0,720]]
+  amr_path: [[0,500],[1280,500],[1280,710],[0,710]]
+  medium_risk: [[100,450],[1180,450],[1180,650],[100,650]]
+  high_risk: [[420,500],[920,500],[920,700],[420,700]]
+logic:
+  fall_vertical_px: 35
+  fall_confirm_frames: 2
+  settled_speed_px_per_frame: 3.5
+  settled_frames: 6
+  amr_near_px: 180
+  amr_confirm_frames: 3
+  medium_overlap: 0.05
+  high_overlap: 0.20
+  track_expiry_frames: 45
+evidence:
+  root: outputs/events
+  pre_event_seconds: 3.0
+  post_event_seconds: 4.0
+  jpeg_quality: 92
