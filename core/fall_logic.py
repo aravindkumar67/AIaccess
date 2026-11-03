@@ -6,7 +6,7 @@ class FallStateMachine:
 
     def __init__(self, config):
         self.config = config
-        self.history = defaultdict(lambda: deque(maxlen=max(3, int(config.get("history_size", 24))))
+        self.history = defaultdict(lambda: deque(maxlen=max(3, int(config.get("history_size", 24)))))
         self.emitted = set()
         self.min_observations = int(config.get("min_track_observations", 5))
         self.min_drop = float(config.get("departure_vertical_pixels", 18))
@@ -23,8 +23,6 @@ class FallStateMachine:
         if len(hist) < self.min_observations:
             return None
 
-        # Use a recent window; a tracked object's downward image displacement
-        # into the configured lower scene region is only a fall-like indicator.
         recent = list(hist)
         displacement = recent[-1][2] - recent[0][2]
         lower_region = bottom_y >= frame_height * self.ground_ratio
