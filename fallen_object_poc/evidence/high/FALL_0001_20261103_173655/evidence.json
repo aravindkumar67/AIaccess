@@ -1,0 +1,68 @@
+{
+  "event_id": "FALL_0001",
+  "signal_level": "high",
+  "timestamp": "2026-11-03T17:36:55.685736Z",
+  "payload_summary": {
+    "Event": "Obstacle",
+    "Anomaly_Type": "Fallen_Component",
+    "event_id": "FALL_0001",
+    "linked_to": null,
+    "Timestamp": "2026-11-03T17:36:55.679124Z",
+    "signal_level": "high",
+    "fallen_onto_ground": true,
+    "amr_approach": false,
+    "uncertain": false,
+    "flags": [],
+    "coords_source": "pixel_space",
+    "Coordinates": null,
+    "Coordinates_Unit": "pixels",
+    "Dimensions": [
+      130,
+      150
+    ],
+    "pixel": [
+      415,
+      575
+    ],
+    "yolo_class": "crate_and_parts",
+    "track_id": 14,
+    "frame": 37,
+    "amr_id": null,
+    "amr_pixel_distance": null,
+    "interior_overlap": 60.0,
+    "strip_overlap": 40.0
+  },
+  "justification_summary": {
+    "event_id": "FALL_0001",
+    "timestamp": "2026-11-03T17:36:55.679210Z",
+    "fallen_object_footprint_pixel_box": [
+      [
+        350,
+        597.5
+      ],
+      [
+        480,
+        650
+      ]
+    ],
+    "path_network_matching": {
+      "corridor_id": "Corridor_A1",
+      "path_file": "path_network.json"
+    },
+    "spatial_risk_analysis": {
+      "interior_overlap_percentage": 60.0,
+      "strip_overlap_percentage": 40.0,
+      "determined_level": "high",
+      "justification_note": "Footprint overlap evaluates to HIGH risk (60.0% inside interior path)."
+    },
+    "amr_escalation_justification": {
+      "amr_track_id": null,
+      "approach_condition_met": false,
+      "final_signal_level": "high",
+      "booleans_updated": {
+        "fallen_onto_ground": true,
+        "amr_approach": false
+      }
+    }
+  }
+}

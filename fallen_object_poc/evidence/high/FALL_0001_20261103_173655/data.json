@@ -1,0 +1,30 @@
+{
+  "Event": "Obstacle",
+  "Anomaly_Type": "Fallen_Component",
+  "event_id": "FALL_0001",
+  "linked_to": null,
+  "Timestamp": "2026-11-03T17:36:55.679124Z",
+  "signal_level": "high",
+  "fallen_onto_ground": true,
+  "amr_approach": false,
+  "uncertain": false,
+  "flags": [],
+  "coords_source": "pixel_space",
+  "Coordinates": null,
+  "Coordinates_Unit": "pixels",
+  "Dimensions": [
+    130,
+    150
+  ],
+  "pixel": [
+    415,
+    575
+  ],
+  "yolo_class": "crate_and_parts",
+  "track_id": 14,
+  "frame": 37,
+  "amr_id": null,
+  "amr_pixel_distance": null,
+  "interior_overlap": 60.0,
+  "strip_overlap": 40.0
+}

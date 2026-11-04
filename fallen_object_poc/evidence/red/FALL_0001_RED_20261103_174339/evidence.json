@@ -1,0 +1,69 @@
+{
+  "event_id": "FALL_0001_RED",
+  "signal_level": "red",
+  "timestamp": "2026-11-03T17:43:39.592030Z",
+  "payload_summary": {
+    "Event": "Obstacle",
+    "Anomaly_Type": "Fallen_Component",
+    "event_id": "FALL_0001_RED",
+    "linked_to": "FALL_0001",
+    "Timestamp": "2026-11-03T17:43:39.585800Z",
+    "signal_level": "red",
+    "fallen_onto_ground": true,
+    "amr_approach": true,
+    "uncertain": false,
+    "flags": [],
+    "coords_source": "pixel_space",
+    "Coordinates": null,
+    "Coordinates_Unit": "pixels",
+    "Dimensions": [
+      130,
+      150
+    ],
+    "pixel": [
+      415,
+      575
+    ],
+    "yolo_class": "crate_and_parts",
+    "track_id": 14,
+    "frame": 75,
+    "amr_id": 101,
+    "amr_pixel_distance": 185.4,
+    "interior_overlap": 60.0,
+    "strip_overlap": 40.0
+  },
+  "justification_summary": {
+    "event_id": "FALL_0001_RED",
+    "linked_to": "FALL_0001",
+    "timestamp": "2026-11-03T17:43:39.585823Z",
+    "fallen_object_footprint_pixel_box": [
+      [
+        350,
+        597.5
+      ],
+      [
+        480,
+        650
+      ]
+    ],
+    "path_network_matching": {
+      "corridor_id": "Corridor_A1",
+      "path_file": "path_network.json"
+    },
+    "spatial_risk_analysis": {
+      "interior_overlap_percentage": 60.0,
+      "strip_overlap_percentage": 40.0,
+      "determined_level": "high",
+      "justification_note": "Object linked to FALL_0001. AMR approach verified on consecutive frames."
+    },
+    "amr_escalation_justification": {
+      "amr_track_id": 101,
+      "approach_condition_met": true,
+      "final_signal_level": "red",
+      "booleans_updated": {
+        "fallen_onto_ground": true,
+        "amr_approach": true
+      }
+    }
+  }
+}

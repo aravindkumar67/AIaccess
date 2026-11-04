@@ -1,0 +1,42 @@
+model:
+  path: "yolo26n.pt"
+  imgsz: 960
+  conf: 0.25
+  iou: 0.5
+  amr_classes: ["car", "truck"]
+  ignored_classes: ["person"]
+
+tracker:
+  type: "bytetrack.yaml"
+  track_buffer: 30
+  track_high_thresh: 0.4
+
+fall_logic:
+  min_time_on_conveyor_sec: 0.4
+  vertical_drop_threshold_pct: 0.05
+  fall_window_sec: 1.0
+  resting_speed_threshold_pct: 0.003
+  resting_duration_sec: 0.25
+  max_fall_duration_sec: 2.0
+  footprint_height_pct: 0.35
+
+grading:
+  high_threshold_pct: 1.0
+  medium_threshold_pct: 1.0
+
+amr_escalation:
+  min_confidence: 0.4
+  min_track_age_frames: 10
+  approach_window_sec: 0.5
+  distance_drop_step_pct: 0.80
+  net_distance_drop_pct: 0.03
+  min_speed_pct: 0.002
+  heading_tolerance_deg: 45.0
+  confirm_frames: 3
+  clear_sec: 0.25
+  max_still_movement_pct: 0.01
+
+evidence:
+  pre_event_clip_sec: 1.5
+  post_event_clip_sec: 2.0
+  jpeg_quality: 90
